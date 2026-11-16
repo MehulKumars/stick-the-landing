@@ -1,0 +1,665 @@
+/* DynaPuff by Toshi Omagari and Jennifer Daniel, and Figtree by Erik Kennedy: both SIL Open Font License 1.1
+   (see docs/LICENSES.md). Provisional picks. */
+@import '@fontsource/dynapuff/latin-600.css';
+@import '@fontsource/dynapuff/latin-700.css';
+@import '@fontsource/figtree/latin-500.css';
+@import '@fontsource/figtree/latin-700.css';
+
+:root {
+  --ink: #14352a;
+  --ink-soft: #3d6152;
+  --paper: #fff8e2;
+  --paper-dim: #f1e8c8;
+  --leaf: #2fa35a;
+  --leaf-deep: #1f7d42;
+  --bloom: #ff4f93;
+  --bloom-deep: #cf2a6c;
+  --sun: #ffc928;
+  --display: 'DynaPuff', 'Trebuchet MS', system-ui, sans-serif;
+  --text: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: linear-gradient(#fff6cf, #a4e2c2 55%, #4bb5a3);
+  color: var(--ink);
+  font-family: var(--text);
+  font-weight: 500;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  border: 0;
+  background: none;
+}
+
+.app {
+  position: relative;
+  height: 100dvh;
+  width: min(100vw, 520px, 66dvh);
+  margin: 0 auto;
+  overflow: hidden;
+  box-shadow: 0 0 80px rgba(20, 53, 42, 0.35);
+}
+
+#stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* ---------- While playing ---------- */
+
+.hud {
+  position: absolute;
+  inset: 0 0 auto 0;
+  padding: max(8px, env(safe-area-inset-top)) 10px 0;
+  display: grid;
+  gap: 6px;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+
+.app:not([data-screen='play']) .hud,
+.app:not([data-screen='play']) .hint,
+.app:not([data-screen='play']) .demo {
+  opacity: 0;
+}
+
+.app:not([data-screen='play']) .hud button {
+  pointer-events: none;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.round {
+  pointer-events: auto;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 3px 0 rgba(20, 53, 42, 0.28);
+}
+
+.round:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(20, 53, 42, 0.28);
+}
+
+.round svg {
+  width: 22px;
+  height: 22px;
+}
+
+.round .cross,
+.round[aria-pressed='true'] .waves {
+  display: none;
+}
+
+.round[aria-pressed='true'] .cross {
+  display: inline;
+}
+
+.title {
+  min-width: 0;
+  margin-right: auto;
+  display: grid;
+  line-height: 1.1;
+  padding: 4px 13px 5px;
+  border-radius: 16px;
+  background: var(--paper);
+  box-shadow: 0 3px 0 rgba(20, 53, 42, 0.22);
+}
+
+.title b {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 19px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+/* Difficulty, as leaves: one for easy, three for hard. */
+.pips {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.pips i {
+  width: 9px;
+  height: 12px;
+  border-radius: 80% 10% 80% 10%;
+  background: rgba(20, 53, 42, 0.18);
+}
+
+.pips i.on {
+  background: var(--leaf);
+}
+
+.goal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 16px;
+  background: var(--paper);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 2px 0 rgba(20, 53, 42, 0.2);
+}
+
+.chip.aim {
+  background: var(--bloom);
+  color: #fff;
+  box-shadow: 0 2px 0 var(--bloom-deep);
+  margin-right: auto;
+}
+
+.chip.aim svg {
+  width: 18px;
+  height: 18px;
+}
+
+.chip.count b {
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip.count b.tick {
+  animation: tick 0.3s ease-out;
+}
+
+@keyframes tick {
+  40% {
+    transform: scale(1.5);
+    color: var(--bloom);
+  }
+}
+
+.toast {
+  justify-self: center;
+  margin: 2px 0 0;
+  padding: 7px 13px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+}
+
+.toast.on {
+  opacity: 1;
+  transform: none;
+}
+
+.hint {
+  position: absolute;
+  inset: auto 12px max(12px, env(safe-area-inset-bottom)) 12px;
+  margin: 0 auto;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  padding: 9px 14px;
+  border-radius: 16px;
+  background: rgba(255, 248, 226, 0.95);
+  font-size: 15px;
+  line-height: 1.3;
+  text-align: center;
+  text-wrap: balance;
+  box-shadow: 0 3px 0 rgba(20, 53, 42, 0.22);
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.hint:empty {
+  display: none;
+}
+
+/* A finger showing the pull, on the very first level. */
+.demo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.demo[hidden] {
+  display: none;
+}
+
+.demo i {
+  position: absolute;
+  left: -19px;
+  top: -19px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 0 0 3px rgba(20, 53, 42, 0.5),
+    0 4px 10px rgba(20, 53, 42, 0.3);
+  animation: pull 1.9s ease-in-out infinite;
+}
+
+@keyframes pull {
+  0% {
+    transform: translate(0, 34px) scale(1.15);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(0, 34px) scale(1);
+    opacity: 1;
+  }
+  65% {
+    transform: translate(-58px, 112px) scale(1);
+    opacity: 1;
+  }
+  80%,
+  100% {
+    transform: translate(-58px, 112px) scale(1.2);
+    opacity: 0;
+  }
+}
+
+/* ---------- The level map ---------- */
+
+.map {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The top of the map is the live scene, with the frog sitting beside the game's name. */
+.hero {
+  flex: 0 0 31%;
+  min-height: 150px;
+  padding: max(16px, env(safe-area-inset-top)) 16px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.shelf {
+  flex: 1;
+  min-height: 0;
+  padding: 14px 16px max(14px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 1.4dvh, 12px);
+  border-radius: 28px 28px 0 0;
+  background: var(--paper);
+  box-shadow: 0 -6px 0 rgba(20, 53, 42, 0.18);
+}
+
+.map[hidden],
+.card[hidden] {
+  display: none;
+}
+
+.wordmark {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(34px, 11.5vw, 50px);
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+  transform: rotate(-2.5deg);
+  transform-origin: left center;
+}
+
+.wordmark,
+.hero .lede {
+  paint-order: stroke fill;
+  -webkit-text-stroke: 9px var(--paper);
+  stroke-linejoin: round;
+}
+
+.hero .lede {
+  -webkit-text-stroke-width: 5px;
+}
+
+.wordmark span {
+  display: block;
+}
+
+.wordmark span + span {
+  padding-left: 0.55em;
+
+}
+
+.lede {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ink);
+  max-width: 21ch;
+}
+
+.tiers {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 6px;
+}
+
+.tier-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 5px;
+}
+
+.tier-head h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 19px;
+}
+
+.tier-head .how-hard {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.tier-head .got {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.nodes {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.node {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 0;
+}
+
+.node .disc {
+  width: min(54px, 100%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 21px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow:
+    inset 0 0 0 3px var(--ink),
+    0 4px 0 var(--ink);
+}
+
+.node[data-state='done'] .disc {
+  background: var(--leaf);
+  color: #fff;
+  box-shadow:
+    inset 0 0 0 3px var(--leaf-deep),
+    0 4px 0 var(--leaf-deep);
+}
+
+.node[data-state='next'] .disc {
+  background: var(--bloom);
+  color: #fff;
+  box-shadow:
+    inset 0 0 0 3px var(--bloom-deep),
+    0 4px 0 var(--bloom-deep);
+  animation: beckon 1.1s ease-in-out infinite alternate;
+}
+
+.node[data-state='locked'] .disc {
+  background: none;
+  color: rgba(20, 53, 42, 0.45);
+  box-shadow: inset 0 0 0 2px rgba(20, 53, 42, 0.3);
+}
+
+.node .disc svg {
+  width: 20px;
+  height: 20px;
+}
+
+.node:active .disc {
+  transform: translateY(3px);
+}
+
+@keyframes beckon {
+  to {
+    transform: translateY(-4px);
+  }
+}
+
+.stars {
+  display: inline-flex;
+  gap: 1px;
+}
+
+.stars svg {
+  width: 13px;
+  height: 13px;
+  color: rgba(20, 53, 42, 0.2);
+}
+
+.stars svg.won {
+  color: var(--sun);
+  stroke: #b97f00;
+  stroke-width: 1.5px;
+}
+
+.cta {
+  flex: none;
+  min-height: 56px;
+  border-radius: 20px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+  background: var(--bloom);
+  color: #fff;
+  box-shadow: 0 5px 0 var(--bloom-deep);
+}
+
+.cta:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--bloom-deep);
+}
+
+.quiet {
+  flex: none;
+  min-height: 50px;
+  padding: 0 18px;
+  border-radius: 18px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 3px var(--ink);
+}
+
+.quiet:active {
+  transform: translateY(2px);
+}
+
+/* ---------- Reaching the flower ---------- */
+
+.card {
+  position: absolute;
+  inset: auto 12px max(14px, env(safe-area-inset-bottom)) 12px;
+  padding: 46px 18px 16px;
+  border-radius: 28px;
+  background: var(--paper);
+  text-align: center;
+  box-shadow:
+    0 6px 0 rgba(20, 53, 42, 0.3),
+    0 20px 50px rgba(20, 53, 42, 0.35);
+  animation: rise 0.4s cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(60px);
+    opacity: 0;
+  }
+}
+
+.card .big-stars {
+  position: absolute;
+  inset: -34px 0 auto 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.card .big-stars svg {
+  width: 64px;
+  height: 64px;
+  color: var(--paper-dim);
+  stroke: rgba(20, 53, 42, 0.35);
+  stroke-width: 1.2px;
+  filter: drop-shadow(0 3px 0 rgba(20, 53, 42, 0.25));
+}
+
+.card .big-stars svg:nth-child(2) {
+  width: 80px;
+  height: 80px;
+}
+
+.card .big-stars svg.won {
+  color: var(--sun);
+  stroke: #b97f00;
+  animation: pop 0.45s cubic-bezier(0.2, 1.8, 0.4, 1) backwards;
+}
+
+.card .big-stars svg.won:nth-child(1) {
+  animation-delay: 0.25s;
+}
+
+.card .big-stars svg.won:nth-child(2) {
+  animation-delay: 0.5s;
+}
+
+.card .big-stars svg.won:nth-child(3) {
+  animation-delay: 0.75s;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0) rotate(-40deg);
+  }
+}
+
+.card h2 {
+  margin: 0 0 4px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+.card p {
+  margin: 0 0 4px;
+  font-size: 16px;
+  color: var(--ink-soft);
+}
+
+.card .actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.card .actions .cta {
+  flex: 1;
+}
+
+button:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+@media (max-height: 620px) {
+  .hero .lede {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo i,
+  .node .disc,
+  .card,
+  .card .big-stars svg,
+  .chip.count b {
+    animation: none !important;
+  }
+}

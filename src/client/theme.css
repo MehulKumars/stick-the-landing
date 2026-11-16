@@ -1,0 +1,92 @@
+/* Shantell Sans by Shantell Martin and Arrow Type, SIL Open Font License 1.1 (see docs/LICENSES.md). Provisional pick, awaiting human sign-off. */
+@import '@fontsource/shantell-sans/latin-400.css';
+@import '@fontsource/shantell-sans/latin-700.css';
+@import '@fontsource/shantell-sans/latin-800.css';
+
+/* Design tokens. Candidate palette from docs/04-GAME-SPEC.md A10 (whitewash, blue ink, sun yellow, pink). */
+:root {
+  --sky: #e9eff6;
+  --ink: #1b2766;
+  --ink-soft: #4a5590;
+  --sun: #f3c94f;
+  --sun-deep: #e0a91f;
+  --shade: #2f49a6;
+  --white: #ffffff;
+  --pink: #e8378a;
+  --water: #9cc6ea;
+  --ok: #1f7a4d;
+  --radius: 14px;
+  --font:
+    'Shantell Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--sky);
+  color: var(--ink);
+  font-family: var(--font);
+  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+svg text {
+  font-family: var(--font);
+}
+
+.ground {
+  fill: var(--sun);
+}
+.grid-line {
+  stroke: var(--ink);
+  stroke-opacity: 0.16;
+  stroke-width: 2;
+}
+.frame {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 6;
+}
+
+.primary {
+  width: 100%;
+  min-height: 52px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--white);
+  font-weight: 700;
+  font-size: 17px;
+}
+.secondary {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--ink);
+  font-weight: 650;
+  font-size: 16px;
+}
+
+/* Creature drawings carry every state; these hide the asleep and wilted layers by default. */
+.cat .eyes-closed,
+.cat .zzz,
+.flower .droop {
+  display: none;
+}

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Siesta</title>
+  </head>
+  <body>
+    <main class="splash">
+      <div class="top">
+        <div class="wordmark">Siesta</div>
+        <div class="level" id="level" aria-hidden="true"></div>
+      </div>
+      <div class="town">
+        <h1 id="town-title">Today’s town</h1>
+        <p id="town-date">&nbsp;</p>
+      </div>
+      <div class="preview-wrap">
+        <svg
+          class="preview"
+          id="preview"
+          viewBox="0 0 100 100"
+          role="img"
+          aria-label="Today’s town"
+        ></svg>
+      </div>
+      <p class="status" id="status">Put the town to sleep.</p>
+      <button type="button" class="primary" id="today" hidden>
+        Go to today’s town
+      </button>
+      <button type="button" class="primary" id="play">Play today’s town</button>
+    </main>
+    <script type="module" src="splash.ts"></script>
+  </body>
+</html>

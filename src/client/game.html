@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>Stick the Landing</title>
+  </head>
+  <body>
+    <div class="app" id="app" data-screen="loading">
+      <canvas id="stage" aria-label="The level"></canvas>
+
+      <div class="hud" id="hud">
+        <div class="bar">
+          <button type="button" class="round" id="map-btn">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 4h5v5H5zM14 4h5v5h-5zM5 13h5v5H5zM14 13h5v5h-5z"
+                fill="currentColor"
+              />
+            </svg>
+          </button>
+          <div class="title">
+            <b id="level-name"></b>
+            <span class="tier" id="tier"></span>
+          </div>
+          <button type="button" class="round" id="retry-btn">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5 12a7 7 0 1 0 2.300-5.200" />
+              <path d="M5 4.500V8h3.500" />
+            </svg>
+          </button>
+          <button type="button" class="round" id="mute-btn" aria-pressed="false">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 9.500v5h3.500L12 18.500v-13L7.500 9.500z" fill="currentColor" />
+              <path class="waves" d="M15.500 9a4.200 4.200 0 0 1 0 6M18 6.500a7.600 7.600 0 0 1 0 11" />
+              <path class="cross" d="M16 9.500l5 5M21 9.500l-5 5" />
+            </svg>
+          </button>
+        </div>
+        <div class="goal">
+          <span class="chip aim">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <g fill="currentColor">
+                <ellipse cx="12" cy="6" rx="3.200" ry="4.400" />
+                <ellipse cx="12" cy="18" rx="3.200" ry="4.400" />
+                <ellipse cx="6" cy="12" rx="4.400" ry="3.200" />
+                <ellipse cx="18" cy="12" rx="4.400" ry="3.200" />
+              </g>
+              <circle cx="12" cy="12" r="3" fill="#ffd640" />
+            </svg>
+            <span id="goal-text"></span>
+          </span>
+          <span class="chip count"><span id="hops-label"></span><b id="hops">0</b></span>
+          <span class="chip count"><span id="par-label"></span><b id="par">0</b></span>
+        </div>
+        <p class="toast" id="toast" aria-live="polite"></p>
+      </div>
+
+      <div class="demo" id="demo" aria-hidden="true"><i></i></div>
+      <p class="hint" id="hint"></p>
+
+      <section class="map" id="map" hidden></section>
+      <section class="card" id="card" hidden></section>
+    </div>
+    <script type="module" src="game.ts"></script>
+  </body>
+</html>

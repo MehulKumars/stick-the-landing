@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../dist/types/node",
+    "tsBuildInfoFile": "../dist/types/node/tsconfig.tsbuildinfo",
+    "types": ["node"],
+    "lib": ["ES2023"],
+    "rootDir": "..",
+    "rewriteRelativeImportExtensions": false,
+    "allowImportingTsExtensions": true,
+    "emitDeclarationOnly": true
+  },
+  "include": ["../src/**/*.test.ts", "../scripts/**/*.ts"],
+  "exclude": [],
+  "references": [
+    { "path": "./tsconfig.shared.json" },
+    { "path": "./tsconfig.server.json" }
+  ]
+}
