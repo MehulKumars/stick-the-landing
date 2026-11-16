@@ -23,10 +23,14 @@ it lands on**: the ground, a wall, the underside of a branch. Every level has on
   the frog is on. Hops are whole numbers of 1/8 tile per second, so a run can be written down and replayed.
 - **Bark** (`#`): the frog sticks where it touches, at any angle.
 - **Wet stone** (`o`) and the bamboo at the sides: too slick to hold. The frog bounces, or slides to a stop on top.
-- **Mushroom** (`M`): throws the frog off at 22 tiles a second, about 7 tiles high, however it arrived.
+- **Mushroom** (`M`): touch it anywhere and it throws the frog straight out from the middle of its cap at 22 tiles
+  a second (about 7 tiles high), whatever way the frog arrived. On the ground that is straight up; on a wall,
+  sideways. It throws once per hop: coming back down on it, the frog just sits on top.
 - **Web** (`W`): catches the frog in mid-air. From a web it can hop in any direction.
 - **Thorns** (`^`) and **water** (`~`, or falling off the bottom): back to the last perch. The hop still counts.
-- **Flower**: touch it to win. Three stars at par or better, two within two hops of par, one for finishing.
+- **Flower**: it has a dotted ring round it. The level is won the moment any part of the frog touches the ring,
+  in the air or at rest. Three stars at par or better, two within two hops of par, one for finishing.
+- A frog that catches the very corner of a block shuffles onto the nearest flat face, so it never hangs at an angle.
 - Physics runs in fixed steps of 1/120 s using only + − × ÷ and square roots, so the server can replay a
   player's hops (`replay`) and land in exactly the same place.
 

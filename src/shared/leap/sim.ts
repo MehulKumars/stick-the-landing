@@ -22,9 +22,18 @@ const SETTLE_SPEED = 1.6;
 const STONE_GRIP = 16;
 /** A mushroom always throws the frog off at this speed, however it arrived: about seven tiles high. */
 const SPRING = 22;
-/** How near the middle of a web or the flower the frog's middle has to come. */
+/** After this many throws in one hop, mushrooms stop throwing and the frog can sit on them. */
+const MOST_SPRINGS = 6;
+/** How near the middle of a web the frog's middle has to come. */
 const WEB_REACH = 0.45;
-const FLOWER_REACH = 0.62;
+/**
+ * The flower has a ring drawn round it, this many tiles from its middle. The level is won the moment
+ * any part of the frog touches the ring, so a frog that looks as if it has reached the flower has.
+ */
+export const FLOWER_RING = 0.85;
+const FLOWER_REACH = FLOWER_RING + FROG_R;
+/** A frog that lands on the very corner of a block shuffles at least this far in from the edge. */
+const CORNER_INSET = 0.2;
 /** A hop that is still in the air after this many steps (ten seconds) is called off. */
 const LONGEST_HOP = 1200;
 
@@ -61,7 +70,18 @@ function isSolid(tile: Tile): boolean {
 }
 
 export function beginRun(level: Level): Run {
-  const frog: Frog = { x: level.start.x, y: level.start.y, vx: 0, vy: 0, perched: true, nx: 0, ny: -1, web: -1 };
+  const frog: Frog = {
+    x: level.start.x,
+    y: level.start.y,
+    vx: 0,
+    vy: 0,
+    perched: true,
+    nx: 0,
+    ny: -1,
+    web: -1,
+    sprung: -1,
+    springs: 0,
+  };
   return { level, frog, home: { ...frog }, hops: 0, won: false, ticks: 0 };
 }
 
@@ -118,8 +138,45 @@ export function hop(run: Run, vx: number, vy: number): boolean {
   run.frog.vx = vx * SPEED_UNIT;
   run.frog.vy = vy * SPEED_UNIT;
   run.frog.perched = false;
+  run.frog.sprung = -1;
+  run.frog.springs = 0;
   run.hops += 1;
   run.ticks = 0;
+  return true;
+}
+
+/**
+ * Which way a mushroom throws: straight out from whatever it grows on. On the ground that is up; on a
+ * wall, sideways. The answer is in board directions (y grows downwards).
+ */
+export function springWay(level: Level, cell: number): Point {
+  const x = cell % level.w;
+  const y = Math.floor(cell / level.w);
+  const holds = (tile: Tile) => tile === '#' || tile === 'o';
+  if (holds(tileAt(level, x, y + 1))) return { x: 0, y: -1 };
+  if (holds(tileAt(level, x + 1, y))) return { x: -1, y: 0 };
+  if (holds(tileAt(level, x - 1, y))) return { x: 1, y: 0 };
+  if (holds(tileAt(level, x, y - 1))) return { x: 0, y: 1 };
+  return { x: 0, y: -1 };
+}
+
+function reachesFlower(level: Level, frog: Frog): boolean {
+  const dx = frog.x - level.flower.x;
+  const dy = frog.y - level.flower.y;
+  return dx * dx + dy * dy < FLOWER_REACH * FLOWER_REACH;
+}
+
+/** Whether the frog could be at a spot without being inside anything solid. */
+function fits(level: Level, x: number, y: number): boolean {
+  const reach = FROG_R - 1e-6;
+  for (let ty = Math.floor(y - FROG_R); ty <= Math.floor(y + FROG_R); ty++) {
+    for (let tx = Math.floor(x - FROG_R); tx <= Math.floor(x + FROG_R); tx++) {
+      if (!isSolid(tileAt(level, tx, ty))) continue;
+      const nearX = x < tx ? tx : x > tx + 1 ? tx + 1 : x;
+      const nearY = y < ty ? ty : y > ty + 1 ? ty + 1 : y;
+      if ((x - nearX) * (x - nearX) + (y - nearY) * (y - nearY) < reach * reach) return false;
+    }
+  }
   return true;
 }
 
@@ -135,6 +192,16 @@ function holdOn(run: Run, nx: number, ny: number): void {
   frog.nx = nx;
   frog.ny = ny;
   run.home = { ...frog };
+}
+
+/** The frog has come to rest somewhere. If that is within reach of the flower, the level is won. */
+function perch(run: Run, type: 'stick' | 'settle' | 'web', nx: number, ny: number, speed: number, cell: number): Happening {
+  holdOn(run, nx, ny);
+  if (reachesFlower(run.level, run.frog)) {
+    run.won = true;
+    return happening('win', run.frog, nx, ny, speed, cell);
+  }
+  return happening(type, run.frog, nx, ny, speed, cell);
 }
 
 /** The frog fell, was pricked or got lost: it goes back to where it last held on. The hop still counts. */
@@ -153,9 +220,7 @@ export function tick(run: Run): Happening | null {
   frog.x += frog.vx * STEP;
   frog.y += frog.vy * STEP;
 
-  const toFlowerX = frog.x - level.flower.x;
-  const toFlowerY = frog.y - level.flower.y;
-  if (toFlowerX * toFlowerX + toFlowerY * toFlowerY < FLOWER_REACH * FLOWER_REACH) {
+  if (reachesFlower(level, frog)) {
     run.won = true;
     frog.vx = 0;
     frog.vy = 0;
@@ -183,8 +248,7 @@ export function tick(run: Run): Happening | null {
       frog.x = cx + 0.5;
       frog.y = cy + 0.5;
       frog.web = cell;
-      holdOn(run, 0, 0);
-      return happening('web', frog, 0, 0, 0, cell);
+      return perch(run, 'web', 0, 0, 0, cell);
     }
   }
 
@@ -244,14 +308,40 @@ export function tick(run: Run): Happening | null {
   // Moving away from the surface already: nothing more to do than to be pushed clear of it.
   if (into >= 0) return null;
 
-  if (hit === '#') {
-    holdOn(run, nx, ny);
-    return happening('stick', frog, nx, ny, -into, hitCell);
+  // A mushroom throws the frog straight out from the middle of its cap, wherever and however it was
+  // hit, so the bounce is always the same. One that has just thrown the frog is plain bark until the
+  // next hop: land on it again and the frog sits there.
+  if (hit === 'M' && hitCell !== frog.sprung && frog.springs < MOST_SPRINGS) {
+    const way = springWay(level, hitCell);
+    frog.x = (hitCell % level.w) + 0.5 + way.x * (0.5 + FROG_R);
+    frog.y = Math.floor(hitCell / level.w) + 0.5 + way.y * (0.5 + FROG_R);
+    frog.vx = way.x * SPRING;
+    frog.vy = way.y * SPRING;
+    frog.sprung = hitCell;
+    frog.springs += 1;
+    return happening('boing', frog, way.x, way.y, -into, hitCell);
   }
-  if (hit === 'M') {
-    frog.vx += (SPRING - into) * nx;
-    frog.vy += (SPRING - into) * ny;
-    return happening('boing', frog, nx, ny, -into, hitCell);
+  if (hit === '#' || hit === 'M') {
+    if (nx !== 0 && ny !== 0 && hitCell >= 0) {
+      // Caught the very corner of a block. Shuffle onto whichever face the frog is more squarely on,
+      // so it sits flat instead of hanging off the corner at an angle.
+      const tx = hitCell % level.w;
+      const ty = Math.floor(hitCell / level.w);
+      const inX = frog.x < tx + CORNER_INSET ? tx + CORNER_INSET : frog.x > tx + 1 - CORNER_INSET ? tx + 1 - CORNER_INSET : frog.x;
+      const inY = frog.y < ty + CORNER_INSET ? ty + CORNER_INSET : frog.y > ty + 1 - CORNER_INSET ? ty + 1 - CORNER_INSET : frog.y;
+      const flat = { x: inX, y: ny < 0 ? ty - FROG_R : ty + 1 + FROG_R, nx: 0, ny: ny < 0 ? -1 : 1 };
+      const side = { x: nx < 0 ? tx - FROG_R : tx + 1 + FROG_R, y: inY, nx: nx < 0 ? -1 : 1, ny: 0 };
+      const flatFirst = (ny < 0 ? -ny : ny) >= (nx < 0 ? -nx : nx);
+      for (const spot of flatFirst ? [flat, side] : [side, flat]) {
+        if (!fits(level, spot.x, spot.y)) continue;
+        frog.x = spot.x;
+        frog.y = spot.y;
+        nx = spot.nx;
+        ny = spot.ny;
+        break;
+      }
+    }
+    return perch(run, 'stick', nx, ny, -into, hitCell);
   }
   // Wet stone. A slow landing on top of it becomes a slide that grinds to a halt; anything else bounces.
   if (ny < -0.7 && -into < SETTLE_SPEED) {
@@ -260,10 +350,7 @@ export function tick(run: Run): Happening | null {
     const slow = STONE_GRIP * STEP;
     if (frog.vx > slow) frog.vx -= slow;
     else if (frog.vx < -slow) frog.vx += slow;
-    else {
-      holdOn(run, 0, -1);
-      return happening('settle', frog, 0, -1, 0, hitCell);
-    }
+    else return perch(run, 'settle', 0, -1, 0, hitCell);
     return null;
   }
   frog.vx -= (1 + STONE_BOUNCE) * into * nx;
@@ -307,6 +394,21 @@ export function foresee(
     if (i % every === 0) points.push({ x: ghost.frog.x, y: ghost.frog.y });
   }
   return { points, ends: null };
+}
+
+/**
+ * How the hop in progress will end, and in how many steps: the frog's own future, worked out ahead so
+ * it can turn its feet towards whatever it is about to land on.
+ */
+export function foretell(run: Run): { ticks: number; ends: Happening | null } {
+  const ghost: Run = { level: run.level, frog: { ...run.frog }, home: { ...run.home }, hops: 0, won: run.won, ticks: run.ticks };
+  let ticks = 0;
+  while (!ghost.frog.perched && !ghost.won && ticks < LONGEST_HOP + 2) {
+    ticks += 1;
+    const event = tick(ghost);
+    if (event && event.type !== 'bounce' && event.type !== 'boing') return { ticks, ends: event };
+  }
+  return { ticks, ends: null };
 }
 
 /** Replays a list of hops on a fresh run (what the server does with a submitted result). */

@@ -65,6 +65,9 @@ export type Frog = {
   ny: number;
   /** The web cell the frog hangs in, or is still leaving; -1 otherwise. */
   web: number;
+  /** The mushroom that last threw the frog on this hop (-1 if none), and how many throws the hop has had. */
+  sprung: number;
+  springs: number;
 };
 
 export type Run = {

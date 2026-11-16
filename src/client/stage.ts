@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { tileAt } from '../shared/leap/sim.ts';
+import { FLOWER_RING, springWay, tileAt } from '../shared/leap/sim.ts';
 import { BOARD_H, BOARD_W } from '../shared/leap/types.ts';
 import type { Frog, Happening, Level, Point, Tile } from '../shared/leap/types.ts';
 import { FrogRig } from './frog.ts';
@@ -83,7 +83,13 @@ export class Stage {
   private readonly nudges: { cell: number; nx: number; ny: number; age: number }[] = [];
   private readonly mushrooms = new Map<number, { cap: THREE.Group; age: number }>();
   private readonly webs = new Map<number, { net: THREE.Group; age: number }>();
-  private flower: { head: THREE.Group; glow: THREE.Sprite; light: THREE.PointLight } | null = null;
+  private flower: {
+    head: THREE.Group;
+    glow: THREE.Sprite;
+    light: THREE.PointLight;
+    ring: THREE.Group;
+    ringPaint: THREE.MeshBasicMaterial;
+  } | null = null;
   private water: THREE.Mesh | null = null;
   private waterTop = -100;
   private readonly ripples: { ring: THREE.Mesh; age: number }[] = [];
@@ -404,6 +410,7 @@ export class Stage {
     this.won = false;
     this.zoom = 0;
     this.sparks.length = 0;
+    this.rig.reset();
     this.aimAt(null, null);
 
     const h = level.h;
@@ -548,13 +555,9 @@ export class Stage {
     const y = Math.floor(cell / level.w);
     const whole = new THREE.Group();
     whole.position.set(x + 0.5, level.h - y - 0.5, 0);
-    // Grow out of whatever solid thing it touches: the ground, or a wall beside it.
-    const holds = (tile: Tile) => tile === '#' || tile === 'o';
-    if (!holds(tileAt(level, x, y + 1))) {
-      if (holds(tileAt(level, x + 1, y))) whole.rotation.z = Math.PI / 2;
-      else if (holds(tileAt(level, x - 1, y))) whole.rotation.z = -Math.PI / 2;
-      else if (holds(tileAt(level, x, y - 1))) whole.rotation.z = Math.PI;
-    }
+    // It grows out of whatever solid thing it touches, and its cap points the way it throws.
+    const way = springWay(level, cell);
+    whole.rotation.z = -Math.atan2(way.x, -way.y);
     const stem = new THREE.Mesh(
       new THREE.CylinderGeometry(0.2, 0.27, 0.62, 14),
       new THREE.MeshStandardMaterial({ color: 0xffeccc, roughness: 0.7 })
@@ -674,8 +677,19 @@ export class Stage {
     const light = new THREE.PointLight(0xff6aa8, 6, 5, 1.6);
     light.position.z = 1;
     whole.add(light);
+    const ring = new THREE.Group();
+    const ringPaint = new THREE.MeshBasicMaterial({ color: 0xff4f9a, transparent: true, opacity: 0.8, fog: false });
+    const bead = new THREE.SphereGeometry(0.038, 8, 6);
+    for (let i = 0; i < 32; i++) {
+      const turn = (i / 32) * Math.PI * 2;
+      const dot = new THREE.Mesh(bead, ringPaint);
+      dot.position.set(Math.cos(turn) * FLOWER_RING, Math.sin(turn) * FLOWER_RING, 0);
+      ring.add(dot);
+    }
+    ring.position.z = 0.05;
+    whole.add(ring);
     this.world.add(whole);
-    this.flower = { head, glow, light };
+    this.flower = { head, glow, light, ring, ringPaint };
   }
 
   // ---------- Size and camera ----------
@@ -754,6 +768,11 @@ export class Stage {
     if (lands) this.landing.position.set(lands.x, level.h - lands.y, FROG_Z);
   }
 
+  /** What the hop in progress is about to land on, so the frog can turn its feet towards it. */
+  expectLanding(landing: { seconds: number; nx: number; ny: number } | null): void {
+    this.rig.landing = landing;
+  }
+
   /** Something happened in the physics: answer it with particles, a nudge of the scenery, a shake. */
   react(event: Happening): void {
     const level = this.level;
@@ -820,7 +839,7 @@ export class Stage {
         break;
       case 'win':
         this.won = true;
-        this.burst(70, x, y, 7.5, [0xff5fa2, 0xffd640, 0xffffff, 0xff9cc6, 0x9be86a], 0.2, 1.3, 7);
+        this.burst(70, level.flower.x, level.h - level.flower.y, 7.5, [0xff5fa2, 0xffd640, 0xffffff, 0xff9cc6, 0x9be86a], 0.2, 1.3, 7);
         this.shake = Math.max(this.shake, 0.18);
         break;
     }
@@ -891,7 +910,7 @@ export class Stage {
     if (!level) return;
     this.clock += dt;
     const still = this.reducedMotion ? 0 : 1;
-    this.rig.update(dt, frog, level.h, FROG_Z, won);
+    this.rig.update(dt, frog, level.h, FROG_Z, level.flower, won);
 
     // A streak of light behind the frog in the air.
     if (!frog.perched && !won) {
@@ -956,7 +975,10 @@ export class Stage {
       this.flower.head.scale.setScalar(open * pulse);
       this.flower.head.rotation.z = this.clock * 0.25 * still + this.bloom * 2.5;
       this.flower.glow.scale.setScalar((2.5 + Math.sin(this.clock * 3) * 0.3 * still) * (1 + this.bloom * 1.6));
-      this.flower.light.intensity = 6 + this.bloom * 5;
+      this.flower.light.intensity = 6 * (1 - this.bloom * 0.85);
+      this.flower.ring.rotation.z = this.clock * 0.35 * still;
+      this.flower.ring.scale.setScalar(1 + this.bloom * 0.9 + Math.sin(this.clock * 3) * 0.015 * still);
+      this.flower.ringPaint.opacity = 0.8 * (1 - this.bloom);
     }
 
     // Leaves sway, rays shimmer, motes rise.

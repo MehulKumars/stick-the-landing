@@ -1,7 +1,7 @@
 // The frog: a small 3D puppet built from spheres and capsules, posed every frame from the physics.
 import * as THREE from 'three';
 import { FROG_R } from '../shared/leap/types.ts';
-import type { Frog } from '../shared/leap/types.ts';
+import type { Frog, Point } from '../shared/leap/types.ts';
 
 const SKIN = 0x7fdc35;
 const SKIN_DARK = 0x4fb02a;
@@ -11,6 +11,8 @@ const TOE = 0xff9a2c;
 const FLANK = 0x2c7be8;
 /** The frog is drawn this much bigger than the circle the physics uses, so it reads on a phone. */
 const LOOKS_BIGGER = 1.28;
+/** This long before it lands, the frog starts turning its feet towards what it is about to land on. */
+const BRACE_TIME = 0.24;
 
 type Leg = { hip: THREE.Group; knee: THREE.Group };
 
@@ -30,6 +32,11 @@ function turnTowards(from: number, to: number, share: number): number {
   while (gap > Math.PI) gap -= Math.PI * 2;
   while (gap < -Math.PI) gap += Math.PI * 2;
   return from + gap * share;
+}
+
+/** The turn that points the frog's back along (upX, upY), in world directions (y up). */
+function leanFor(upX: number, upY: number): number {
+  return upX === 0 && upY === 0 ? 0 : -Math.atan2(upX, upY);
 }
 
 export class FrogRig {
@@ -54,8 +61,15 @@ export class FrogRig {
   private blink = 0;
   private lastVx = 1;
   private clock = 0;
+  private placed = false;
+  private joy = 0;
   /** Where the player is aiming, in world units (y up), or null. */
   aim: { x: number; y: number; power: number } | null = null;
+  /**
+   * What the hop in progress will land on, and how soon: seconds to go, and the way out of that
+   * surface in board directions ((0, 0) for a web or the flower). Null when there is nothing to brace for.
+   */
+  landing: { seconds: number; nx: number; ny: number } | null = null;
 
   constructor() {
     const skin = new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.45 });
@@ -156,17 +170,31 @@ export class FrogRig {
   /** Reappear at the last perch after a fall. */
   reappear(): void {
     this.pop = 0;
+    this.placed = false;
   }
 
-  update(dt: number, frog: Frog, height: number, depth: number, won: boolean): void {
+  /** A new level: forget the last one's celebration and position. */
+  reset(): void {
+    this.placed = false;
+    this.joy = 0;
+    this.landing = null;
+    this.aim = null;
+  }
+
+  update(dt: number, frog: Frog, height: number, depth: number, flower: Point, won: boolean): void {
     this.clock += dt;
     const flying = !frog.perched && !won;
     const vx = frog.vx;
     const vy = -frog.vy;
     const speed = Math.sqrt(vx * vx + vy * vy);
     if (flying && Math.abs(vx) > 0.5) this.lastVx = vx;
+    if (won) this.joy += dt;
 
-    this.air = lerp(this.air, flying ? 1 : 0, Math.min(1, dt * (flying ? 16 : 22)));
+    // In the last moments of a hop the frog braces: it turns its feet to the surface and reaches for it.
+    const landing = flying ? this.landing : null;
+    const brace = landing && landing.seconds < BRACE_TIME ? 1 - Math.max(0, landing.seconds) / BRACE_TIME : 0;
+
+    this.air = lerp(this.air, flying ? 1 - 0.75 * brace : 0, Math.min(1, dt * (flying ? 16 : 22)));
     this.crouch = lerp(this.crouch, this.aim && !flying ? this.aim.power : 0, Math.min(1, dt * 18));
     this.pop = Math.min(1, this.pop + dt * 5);
 
@@ -174,11 +202,9 @@ export class FrogRig {
     this.splatSpeed += (-this.splat * 260 - this.splatSpeed * 14) * dt;
     this.splat += this.splatSpeed * dt;
 
-    // Which way is "up" for the frog: out of whatever it is holding, or tipped along its flight.
-    const upX = frog.nx;
-    let upY = -frog.ny;
-    if (upX === 0 && upY === 0) upY = 1;
-    let lean = -Math.atan2(upX, upY);
+    // Which way is "up" for the frog: out of whatever it is holding, tipped along its flight, or, on
+    // the flower, simply up.
+    let lean = won ? 0 : leanFor(frog.nx, -frog.ny);
     let headX = this.lastVx >= 0 ? 0.5 : -0.5;
     let headY = 0.6;
     if (this.aim && !flying) {
@@ -187,6 +213,7 @@ export class FrogRig {
     }
     if (flying) {
       lean = Math.max(-1.1, Math.min(1.1, Math.atan2(vy, Math.abs(vx) + 4))) * (vx >= 0 ? 1 : -1);
+      if (landing && brace > 0) lean = turnTowards(lean, leanFor(landing.nx, -landing.ny), brace);
       this.facing = this.lastVx >= 0 ? 1 : -1;
     } else {
       // Sitting: point the head whichever way along the surface suits where the frog is looking.
@@ -194,7 +221,7 @@ export class FrogRig {
       const alongY = Math.sin(lean);
       this.facing = alongX * headX + alongY * headY >= 0 ? 1 : -1;
     }
-    this.tilt.rotation.z = turnTowards(this.tilt.rotation.z, lean, Math.min(1, dt * (flying ? 10 : 26)));
+    this.tilt.rotation.z = turnTowards(this.tilt.rotation.z, lean, Math.min(1, dt * (flying ? 14 : 26)));
     this.yaw = turnTowards(this.yaw, this.facing > 0 ? -0.5 : Math.PI + 0.5, Math.min(1, dt * 14));
     this.turn.rotation.y = this.yaw;
 
@@ -233,12 +260,36 @@ export class FrogRig {
       lookY = up / size;
     }
     this.eyes.forEach((socket, index) => {
-      socket.scale.y = this.blink > 0 ? 0.15 : 1;
+      // Eyes shut in a happy squint on the flower.
+      socket.scale.y = this.blink > 0 || (won && this.joy > 0.25) ? 0.15 : 1;
       const side = index === 0 ? -1 : 1;
       this.pupils[index]?.position.set(0.02 + lookX * 0.075, 0.012 + lookY * 0.06, side * 0.05);
     });
 
-    const bob = frog.perched && frog.nx === 0 && frog.ny === 0 ? Math.sin(this.clock * 2.4) * 0.04 : 0;
-    this.root.position.set(frog.x, height - frog.y + bob, depth);
+    // Where to draw the frog. In the air it is exactly where the physics says. Sitting, it eases
+    // into place, so a shuffle onto a ledge reads as a shuffle. On the flower it hops on top and
+    // bounces for joy.
+    const hanging = frog.perched && frog.nx === 0 && frog.ny === 0 && !won;
+    let wantX = frog.x;
+    let wantY = height - frog.y + (hanging ? Math.sin(this.clock * 2.4) * 0.04 : 0);
+    let wantZ = depth;
+    if (won) {
+      const settle = Math.max(0, 1 - this.joy / 2.4);
+      wantX = flower.x;
+      wantY = height - flower.y + 0.16 + Math.abs(Math.sin(this.joy * 8.5)) * 0.32 * settle;
+      wantZ = depth + 0.34;
+    }
+    const gapX = wantX - this.root.position.x;
+    const gapY = wantY - this.root.position.y;
+    const far = gapX * gapX + gapY * gapY > 1.6 * 1.6;
+    if (!this.placed || flying || (far && !won)) {
+      this.root.position.set(wantX, wantY, wantZ);
+      this.placed = true;
+    } else {
+      const ease = Math.min(1, dt * (won ? 9 : 24));
+      this.root.position.x += gapX * ease;
+      this.root.position.y += gapY * ease;
+      this.root.position.z += (wantZ - this.root.position.z) * ease;
+    }
   }
 }

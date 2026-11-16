@@ -90,6 +90,77 @@ test('a mushroom throws the frog higher than it can hop', () => {
   assert.ok(level.start.y - top > best + 1.5, `rose ${level.start.y - top}, a hop reaches ${best}`);
 });
 
+test('a mushroom throws straight up from the middle of its cap, whatever way the frog came', () => {
+  const level = readLevel(plan(['.......F', ...OPEN.slice(1), '.S.M....', '########', '########']));
+  for (const [vx, vy] of [[28, -90], [40, -70], [20, -100]] as const) {
+    const run = beginRun(level);
+    assert.equal(hop(run, vx, vy), true);
+    let thrown = false;
+    for (let i = 0; i < 300 && !thrown; i++) thrown = tick(run)?.type === 'boing';
+    assert.equal(thrown, true, `hop ${vx}, ${vy} never reached the mushroom`);
+    assert.equal(run.frog.vx, 0);
+    assert.equal(run.frog.vy, -22);
+    assert.equal(run.frog.x, 3.5);
+    assert.equal(run.frog.y, 10 - FROG_R);
+  }
+});
+
+test('a mushroom throws once a hop: coming back down on it, the frog sits on top', () => {
+  const level = readLevel(plan(['.......F', ...OPEN.slice(1), '.S.M....', '########', '########']));
+  const run = beginRun(level);
+  const end = playHop(run, 28, -90);
+  assert.equal(end?.type, 'stick');
+  assert.equal(run.frog.x, 3.5);
+  assert.equal(run.frog.y, 10 - FROG_R);
+  assert.equal(run.frog.ny, -1);
+  assert.equal(run.hops, 1);
+});
+
+test('a mushroom on a wall throws sideways', () => {
+  const level = readLevel(plan(['.......F', ...OPEN.slice(1, 6), '#M......', ...OPEN.slice(7), '.S......', '########', '########']));
+  const run = beginRun(level);
+  assert.equal(hop(run, 0, -136), true);
+  let thrown = null;
+  for (let i = 0; i < 300 && !thrown; i++) {
+    const event = tick(run);
+    if (event?.type === 'boing') thrown = event;
+  }
+  assert.ok(thrown);
+  assert.equal(run.frog.vx, 22);
+  assert.equal(run.frog.vy, 0);
+});
+
+test('a frog that comes to rest touching the ring round the flower has reached it', () => {
+  // The flower stands on the ledge; the frog lands on the same ledge, one tile to its left.
+  const level = readLevel(plan([...OPEN.slice(0, 8), '.....F..', '....###.', '.S......', '########', '########']));
+  const run = beginRun(level);
+  playHop(run, 41, -112);
+  assert.equal(run.won, true);
+  // A full tile and a half away is not close enough.
+  const far = readLevel(plan([...OPEN.slice(0, 8), '......F.', '....###.', '.S......', '########', '########']));
+  const other = beginRun(far);
+  other.frog.x = 4.4;
+  other.frog.y = 9 - FROG_R;
+  assert.equal(hop(other, 0, -40), true);
+  let last = null;
+  while (!other.frog.perched && !other.won) last = tick(other) ?? last;
+  assert.equal(other.won, false);
+  assert.equal(last?.type, 'stick');
+});
+
+test('catching the corner of a block, the frog shuffles onto a flat face', () => {
+  const level = readLevel(plan(['.......F', ...OPEN.slice(1), '.S..#...', '########', '########']));
+  for (let vy = -60; vy >= -110; vy -= 2) {
+    for (let vx = 30; vx <= 90; vx += 4) {
+      const run = beginRun(level);
+      const end = playHop(run, vx, vy);
+      if (end?.type !== 'stick') continue;
+      const flat = (run.frog.nx === 0 && Math.abs(run.frog.ny) === 1) || (run.frog.ny === 0 && Math.abs(run.frog.nx) === 1);
+      assert.equal(flat, true, `hop ${vx}, ${vy} left the frog on a corner (${run.frog.nx}, ${run.frog.ny})`);
+    }
+  }
+});
+
 test('a web holds the frog in mid-air, and lets it hop any way', () => {
   const level = readLevel(plan([...OPEN.slice(0, 7), '.W......', '........', '........', '.S......', '########', '#######F']));
   const run = beginRun(level);

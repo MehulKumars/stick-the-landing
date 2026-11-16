@@ -11,7 +11,9 @@ Siesta's and are not wired to the new game. Everything below "Done" is Siesta hi
 - [x] 3D client (`src/client/stage.ts`, `frog.ts`, `game.ts`): home with level map, play, win card. Runs
       locally with no server calls. Checked with Playwright at 360×640, 390×844 and 1280×800: no page scroll,
       no console errors (WebGL through SwiftShader in headless Chromium)
-- [ ] Not played by a human yet, and not run on a real phone: frame rate on low-end devices is unknown
+- [x] Played by the owner up to level 8 (desktop browser). His three reports are fixed and covered by tests:
+      mushroom direction, flower reach (now a visible ring), landing pose. 16 unit tests for the rules
+- [ ] Not run on a real phone: frame rate on low-end devices is unknown
 - [ ] Next: owner's verdict on the feel; then daily levels (generated + proven), multiplayer race,
       server port (verify by replay), inline splash, community levels, real sounds
 - [ ] Known gaps: progress is in localStorage (must move to Redis); three.js adds about 500 kB to the game

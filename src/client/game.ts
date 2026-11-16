@@ -3,7 +3,7 @@ import { leap as copy } from './copy.ts';
 import { isMuted, setMuted, sound, unlockAudio } from './sound.ts';
 import { Stage } from './stage.ts';
 import { LEVELS, TIERS } from '../shared/leap/levels.ts';
-import { aim, beginRun, foresee, hop, starsFor, tick } from '../shared/leap/sim.ts';
+import { aim, beginRun, foresee, foretell, hop, starsFor, tick } from '../shared/leap/sim.ts';
 import { MAX_SPEED, SPEED_UNIT, STEP } from '../shared/leap/types.ts';
 import type { Happening, Level, Point, Run } from '../shared/leap/types.ts';
 
@@ -100,6 +100,18 @@ let owed = 0;
 let last = 0;
 let toastTimer = 0;
 let cardTimer = 0;
+/** How the hop in the air will end: steps to go, and the way out of what it lands on. */
+let fate: { ticks: number; nx: number; ny: number } | null = null;
+
+/** Works out where the hop in progress ends, so the frog can get its feet ready. */
+function readFate(): void {
+  const ahead = foretell(run);
+  const kind = ahead.ends?.type;
+  fate =
+    ahead.ends && (kind === 'stick' || kind === 'settle' || kind === 'web' || kind === 'win')
+      ? { ticks: ahead.ticks, nx: kind === 'win' ? 0 : ahead.ends.nx, ny: kind === 'win' ? 0 : ahead.ends.ny }
+      : null;
+}
 
 function missingLevels(): never {
   throw new Error('There are no levels');
@@ -191,6 +203,7 @@ function enter(which: number): void {
   pull = null;
   aimed = null;
   owed = 0;
+  fate = null;
   window.clearTimeout(cardTimer);
   stage.load(level);
   layout();
@@ -313,6 +326,7 @@ function letGo(): void {
   const vx = shot.vx * SPEED_UNIT;
   const vy = shot.vy * SPEED_UNIT;
   stage.kick(from, vx, vy);
+  readFate();
   sound.hop(Math.sqrt(vx * vx + vy * vy) / MAX_SPEED);
   hint.textContent = '';
   demo.hidden = true;
@@ -337,9 +351,11 @@ function answer(event: Happening): void {
       break;
     case 'bounce':
       sound.bounce();
+      readFate();
       break;
     case 'boing':
       sound.boing();
+      readFate();
       break;
     case 'web':
       sound.web();
@@ -426,14 +442,19 @@ function frame(ms: number): void {
     for (let steps = 0; owed >= STEP && steps < 12; steps++) {
       owed -= STEP;
       const event = tick(run);
+      if (fate) fate.ticks -= 1;
       if (event) answer(event);
-      if (run.frog.perched || run.won) owed = 0;
+      if (run.frog.perched || run.won) {
+        owed = 0;
+        fate = null;
+      }
     }
   }
   if (!demo.hidden) {
     const at = stage.screenOf(run.frog.x, run.frog.y);
     demo.style.transform = `translate(${at.x}px, ${at.y}px)`;
   }
+  stage.expectLanding(fate ? { seconds: fate.ticks * STEP, nx: fate.nx, ny: fate.ny } : null);
   stage.update(dt, run.frog, run.won);
   requestAnimationFrame(frame);
 }
